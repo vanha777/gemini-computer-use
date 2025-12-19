@@ -9,7 +9,7 @@ export default function ControlPage() {
     const machineId = params.id as string;
     const [status, setStatus] = useState("connecting");
     const channelRef = useRef<any>(null);
-    const [prompt, setPrompt] = useState("this is a test, try to move mouse onto the center of this screen");
+    const [prompt, setPrompt] = useState("this is a test, try to move mouse onto the center of this screen then stop.");
     const [history, setHistory] = useState<any[]>([]);
     const [isTyping, setIsTyping] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
