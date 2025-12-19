@@ -2,6 +2,12 @@ use base64::{engine::general_purpose, Engine as _};
 use enigo::{Button, Coordinate, Direction, Enigo, Keyboard, Mouse, Settings};
 use image::ImageOutputFormat;
 use std::io::Cursor;
+use tauri::Manager;
+
+#[cfg(target_os = "macos")]
+use cocoa::appkit::{NSWindow, NSWindowCollectionBehavior};
+#[cfg(target_os = "macos")]
+use cocoa::base::id;
 
 #[tauri::command]
 fn move_mouse(x: i32, y: i32) -> Result<(), String> {
@@ -234,6 +240,42 @@ fn capture_screen() -> Result<ScreenCaptureResponse, String> {
     })
 }
 
+#[tauri::command]
+fn start_ai_glow(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("glow_layer") {
+        let _ = window.maximize(); // Ensure it covers the screen without a new Space
+
+        #[cfg(target_os = "macos")]
+        unsafe {
+            use cocoa::appkit::NSWindow;
+            let ns_window = window.ns_window().unwrap() as id;
+
+            // 1. Set Collection Behavior FIRST
+            // CanJoinAllSpaces + FullScreenAuxiliary is critical for overlays
+            let behavior = NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
+                | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary;
+            ns_window.setCollectionBehavior_(behavior);
+
+            // 2. Set Level to Status (25)
+            // 25 is NSStatusWindowLevel, higher than main menu
+            ns_window.setLevel_(25);
+
+            // 3. Force visibility regardless of activation
+            ns_window.orderFrontRegardless();
+        }
+
+        let _ = window.show();
+        let _ = window.set_focus();
+
+        // THIS IS THE KEY:
+        // This tells the OS to let mouse clicks pass through this window.
+        // Requires "macos-private-api" feature in Cargo.toml
+        let _ = window.set_ignore_cursor_events(true);
+    } else {
+        eprintln!("Error: glow_layer window not found in configuration.");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -246,7 +288,8 @@ pub fn run() {
             scroll_wheel,
             press_key,
             type_text,
-            capture_screen
+            capture_screen,
+            start_ai_glow
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

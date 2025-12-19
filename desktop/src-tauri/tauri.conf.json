@@ -10,6 +10,7 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Gemini Computer Use",
@@ -17,6 +18,21 @@
         "height": 600,
         "resizable": true,
         "fullscreen": false
+      },
+      {
+        "label": "glow_layer",
+        "url": "glow",
+        "title": "Glow Overlay",
+        "width": 800,
+        "height": 600,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": false,
+        "fullscreen": false,
+        "visible": false,
+        "visibleOnAllWorkspaces": false,
+        "resizable": false,
+        "skipTaskbar": true
       }
     ],
     "security": {

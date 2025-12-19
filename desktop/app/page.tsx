@@ -26,6 +26,7 @@ export default function Home() {
   const [connectionCode, setConnectionCode] = useState<string>("");
   const { moveMouse, clickMouse, typeText, mouseDown, mouseUp, scroll, pressKey } = useDesktopControl();
   const [channelRef, setChannelRef] = useState<any>(null);
+  const overlayStarted = useRef(false);
 
   useEffect(() => {
     // Generate or retrieve existing machine ID
@@ -119,6 +120,15 @@ export default function Home() {
 
     registerSession();
   }, []);
+
+  useEffect(() => {
+    // Only start glow when actively controlled
+    if (status === 'active' && !overlayStarted.current) {
+      console.log("Status active, starting Ghost Overlay...");
+      invoke('start_ai_glow').catch((e) => console.error("Failed to start glow layer:", e));
+      overlayStarted.current = true;
+    }
+  }, [status]);
 
   // Helper to scale coordinates
   const scaleCoords = (x: number, y: number) => {
