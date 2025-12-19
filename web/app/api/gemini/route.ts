@@ -10,7 +10,7 @@ const model = genAI.getGenerativeModel({
     systemInstruction: {
         role: "system",
         parts: [{
-            text: `You are a computer use agent. Your goal is to help the user control their computer to accomplish tasks. Critical: end sessions if task is finished.`
+            text: `You are a computer use agent. Your goal is to help the user control their computer to accomplish tasks. Critical: When the user's task is complete, you MUST include the word "DONE" in your response to terminate the session.`
         }]
     }
 });

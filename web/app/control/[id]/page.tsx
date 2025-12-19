@@ -96,7 +96,7 @@ export default function ControlPage() {
                     screenshotResolver.current = null;
                     reject("Screenshot timed out");
                 }
-            }, 15000); // 15s timeout for large images
+            }, 45000); // 45s timeout for large images
 
             screenshotResolver.current = (img: string) => {
                 clearTimeout(timeout);
@@ -195,7 +195,8 @@ export default function ControlPage() {
                     // It just treats next turn as "user: here is screen". This is often "good enough" for visual agents.
                 } else {
                     addLog("No actions requested.");
-                    if (data.text && data.text.toLowerCase().includes("done")) {
+                    const lowerText = (data.text || "").toLowerCase();
+                    if (lowerText.includes("done") || lowerText.includes("success") || lowerText.includes("completed") || lowerText.includes("finished")) {
                         addLog("Task looks complete.");
                         break;
                     }

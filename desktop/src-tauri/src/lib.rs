@@ -208,7 +208,7 @@ fn capture_screen() -> Result<ScreenCaptureResponse, String> {
 
     let dynamic_image = image::DynamicImage::ImageRgba8(image);
 
-    let resized = dynamic_image.resize(1024, 1024, image::imageops::FilterType::Lanczos3);
+    let resized = dynamic_image.resize(1024, 1024, image::imageops::FilterType::Triangle);
 
     let scaled_width = resized.width();
     let scaled_height = resized.height();
