@@ -20,15 +20,33 @@ export default function ControlPage() {
         });
 
         channel
-            .subscribe((status) => {
-                if (status === "SUBSCRIBED") {
+            .on('broadcast', { event: 'command' }, (payload: any) => {
+                // Determine if we need to listen to anything from desktop? 
+                // Mostly desktop sends nothing back properly yet, but good to have.
+                console.log("Received broadcast from desktop:", payload);
+            })
+            .on('presence', { event: 'sync' }, () => {
+                const state = channel.presenceState();
+                console.log("Presence sync:", state);
+
+                // Check if desktop is present
+                const hasDesktop = Object.values(state).some((presences: any) =>
+                    presences.some((p: any) => p.type === 'desktop')
+                );
+
+                if (hasDesktop) {
                     setStatus("connected");
-                    // Notify desktop we remain active
-                    supabase
-                        .from("computer_use_sessions")
-                        .update({ status: "active" })
-                        .eq("machine_id", machineId)
-                        .then();
+                } else {
+                    setStatus("waiting_for_desktop");
+                }
+            })
+            .subscribe(async (status) => {
+                if (status === "SUBSCRIBED") {
+                    // Track our presence as 'controller'
+                    await channel.track({ type: 'controller', online_at: new Date().toISOString() });
+                    // Don't set status connected yet, wait for sync to confirm desktop is there
+                } else if (status === "CLOSED" || status === "TIMED_OUT" || status === "CHANNEL_ERROR") {
+                    setStatus("disconnected");
                 }
             });
 

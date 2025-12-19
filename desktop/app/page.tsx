@@ -20,24 +20,36 @@ export default function Home() {
     }
     setMachineId(id);
 
-    // Register session
+    // Check for existing User ID (Already linked?)
+    const savedUserId = localStorage.getItem("user_id");
+
+    // Register session (initial setup)
     const registerSession = async () => {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setConnectionCode(code);
 
-      const { error } = await supabase
+      // We still update the DB for initial discovery, but status is managed via Presence now
+      // Upsert current state
+      // If we have a user_id, we include it to ensure we are "online" for that user
+      // If we don't, we remain "waiting" for a claim
+      await supabase
         .from("computer_use_sessions")
         .upsert({
           machine_id: id,
           connection_code: code,
-          status: "pending",
+          // If we are already linked, we are active immediately (subject to presence)
+          status: savedUserId ? "active" : "waiting",
+          user_id: savedUserId || null,
           updated_at: new Date().toISOString(),
         }, { onConflict: "machine_id" });
 
-      if (error) console.error("Error registering session:", error);
-
-      // Listen for commands (using broadcast for low latency)
-      const channel = supabase.channel(`computer_use_${id}`);
+      const channel = supabase.channel(`computer_use_${id}`, {
+        config: {
+          presence: {
+            key: 'desktop',
+          },
+        },
+      });
 
       channel
         .on("broadcast", { event: "command" }, (payload) => {
@@ -50,13 +62,45 @@ export default function Home() {
           table: "computer_use_sessions",
           filter: `machine_id=eq.${id}`,
         }, (payload) => {
-          console.log("Session update:", payload);
-          setStatus(payload.new.status);
+          // Watch for "Claiming" event (user_id changing from null to something)
+          const newUser = payload.new.user_id;
+          if (newUser && newUser !== savedUserId) {
+            console.log("Device claimed by user:", newUser);
+            localStorage.setItem("user_id", newUser);
+            // Reload to pick up new state or just set it
+            window.location.reload();
+          }
         })
-        .subscribe((status) => {
+        .on("presence", { event: "sync" }, () => {
+          const state = channel.presenceState();
+          console.log("Presence sync:", state);
+
+          // Check if a controller is present
+          const hasController = Object.values(state).some((presences: any) =>
+            presences.some((p: any) => p.type === 'controller')
+          );
+
+          if (hasController) {
+            setStatus("active");
+          } else {
+            // If linked, we show distinct status
+            setStatus(localStorage.getItem("user_id") ? "linked_waiting" : "waiting_to_be_claimed");
+          }
+        })
+        .subscribe(async (status) => {
           console.log("Subscription status:", status);
           if (status === "SUBSCRIBED") {
-            setStatus("waiting_for_connection");
+            // Track our presence as 'desktop'
+            // Track presence with User ID if available
+            await channel.track({
+              type: 'desktop',
+              user_id: savedUserId,
+              online_at: new Date().toISOString()
+            });
+
+            setStatus(savedUserId ? "linked_waiting" : "waiting_to_be_claimed");
+          } else if (status === "CLOSED" || status === "TIMED_OUT" || status === "CHANNEL_ERROR") {
+            setStatus("disconnected");
           }
         });
 

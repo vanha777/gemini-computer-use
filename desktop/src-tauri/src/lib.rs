@@ -1,27 +1,30 @@
 use enigo::{Button, Coordinate, Direction, Enigo, Keyboard, Mouse, Settings};
 
 #[tauri::command]
-fn move_mouse(x: i32, y: i32) {
-    let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    let _ = enigo.move_mouse(x, y, Coordinate::Abs);
+fn move_mouse(x: i32, y: i32) -> Result<(), String> {
+    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("Failed to init enigo: {:?}", e))?;
+    enigo.move_mouse(x, y, Coordinate::Abs).map_err(|e| format!("Failed to move mouse: {:?}", e))?;
+    Ok(())
 }
 
 #[tauri::command]
-fn click_mouse(button: String) {
-    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+fn click_mouse(button: String) -> Result<(), String> {
+    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("Failed to init enigo: {:?}", e))?;
     let btn = match button.as_str() {
         "left" => Button::Left,
         "right" => Button::Right,
         "middle" => Button::Middle,
-        _ => return,
+        _ => return Err("Invalid button".to_string()),
     };
-    let _ = enigo.button(btn, Direction::Click);
+    enigo.button(btn, Direction::Click).map_err(|e| format!("Failed to click: {:?}", e))?;
+    Ok(())
 }
 
 #[tauri::command]
-fn type_text(text: String) {
-    let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    let _ = enigo.text(&text);
+fn type_text(text: String) -> Result<(), String> {
+    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("Failed to init enigo: {:?}", e))?;
+    enigo.text(&text).map_err(|e| format!("Failed to type: {:?}", e))?;
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
