@@ -26,9 +26,45 @@ export const useDesktopControl = () => {
         }
     };
 
+    const mouseDown = async (button: 'left' | 'right' | 'middle') => {
+        try {
+            await invoke('mouse_down', { button });
+        } catch (error) {
+            console.error('Failed to mouse down:', error);
+        }
+    };
+
+    const mouseUp = async (button: 'left' | 'right' | 'middle') => {
+        try {
+            await invoke('mouse_up', { button });
+        } catch (error) {
+            console.error('Failed to mouse up:', error);
+        }
+    };
+
+    const scroll = async (deltaX: number, deltaY: number) => {
+        try {
+            await invoke('scroll_wheel', { deltaX, deltaY });
+        } catch (error) {
+            console.error('Failed to scroll:', error);
+        }
+    };
+
+    const pressKey = async (key: string, modifiers: string[] = []) => {
+        try {
+            await invoke('press_key', { key, modifiers });
+        } catch (error) {
+            console.error('Failed to press key:', error);
+        }
+    };
+
     return {
         moveMouse,
         clickMouse,
         typeText,
+        mouseDown,
+        mouseUp,
+        scroll,
+        pressKey,
     };
 };

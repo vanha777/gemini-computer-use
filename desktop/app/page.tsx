@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/src/lib/supabase";
 import { useDesktopControl } from "@/src/hooks/use-desktop-control";
 import { invoke } from "@tauri-apps/api/core";
@@ -9,14 +9,22 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 
 export default function Home() {
   const [machineId, setMachineId] = useState<string>("");
-  const [screenDims, setScreenDims] = useState<{
+  // Use Ref for dims to avoid stale closures in the event listener
+  const screenDimsRef = useRef<{
     original: { w: number, h: number },
+    logical: { w: number, h: number },
     scaled: { w: number, h: number },
-    scale_factor: number
+    scale_factor: number,
+    offset: { x: number, y: number }
   } | null>(null);
+
+  // Keep state for UI if needed, or just use ref. Since we don't display dims, ref is fine.
+  // Actually, keeping state might be useful for debugging if we wanted to show it, 
+  // but for the logic, the ref is critical.
+
   const [status, setStatus] = useState<string>("disconnected");
   const [connectionCode, setConnectionCode] = useState<string>("");
-  const { moveMouse, clickMouse, typeText } = useDesktopControl();
+  const { moveMouse, clickMouse, typeText, mouseDown, mouseUp, scroll, pressKey } = useDesktopControl();
   const [channelRef, setChannelRef] = useState<any>(null);
 
   useEffect(() => {
@@ -112,26 +120,33 @@ export default function Home() {
     registerSession();
   }, []);
 
-  const handleCommand = async (cmd: any, channel: any) => {
+  // Helper to scale coordinates
+  const scaleCoords = (x: number, y: number) => {
+    const dims = screenDimsRef.current;
+    if (!dims) {
+      console.warn("Screen dims not set, using raw coordinates");
+      return { x, y }; // Fallback
+    }
 
-    // Helper to scale coordinates
-    const scaleCoords = (x: number, y: number) => {
-      if (!screenDims) return { x, y }; // Fallback
+    // AI Coord -> Logical Coord
+    // Gemini 2.x Computer Use uses 1000x1000 normalized coordinates by default
+    // regardless of the aspect ratio of the input image.
+    // So (500, 500) is always the center of the total screen space.
 
-      // AI Coord -> Physical Coord -> Logical Coord
-      // 1. Scale AI (1024) to Physical (e.g. 3024)
-      const physicalX = x * (screenDims.original.w / screenDims.scaled.w);
-      const physicalY = y * (screenDims.original.h / screenDims.scaled.h);
+    const logicalX = (x / 1000 * dims.logical.w) + dims.offset.x;
+    const logicalY = (y / 1000 * dims.logical.h) + dims.offset.y;
 
-      // 2. Scale Physical to Logical (Enigo uses logical coordinates on macOS)
-      const logicalX = physicalX / screenDims.scale_factor;
-      const logicalY = physicalY / screenDims.scale_factor;
+    console.log(`[ScaleCoords] Input: (${x}, ${y})`);
+    console.log(`[ScaleCoords] Dims: Logical(${dims.logical.w}x${dims.logical.h}), Normalization(1000x1000), Offset(${dims.offset.x},${dims.offset.y})`);
+    console.log(`[ScaleCoords] Result: (${Math.round(logicalX)}, ${Math.round(logicalY)})`);
 
-      return {
-        x: Math.round(logicalX),
-        y: Math.round(logicalY)
-      };
+    return {
+      x: Math.round(logicalX),
+      y: Math.round(logicalY)
     };
+  };
+
+  const handleCommand = async (cmd: any, channel: any) => {
 
     switch (cmd.type) {
       case "params":
@@ -139,7 +154,7 @@ export default function Home() {
         break;
 
       // Native Gemini Computer Use Actions
-      case "click_at":
+      case "click_at": {
         const x = cmd.x || cmd.x_coordinate;
         const y = cmd.y || cmd.y_coordinate;
         if (x !== undefined && y !== undefined) {
@@ -149,8 +164,9 @@ export default function Home() {
         }
         await clickMouse("left"); // Native tool usually implies left click
         break;
+      }
 
-      case "type_text_at":
+      case "type_text_at": {
         // Some versions of the model might include coordinates for typing
         const tx = cmd.x || cmd.x_coordinate;
         const ty = cmd.y || cmd.y_coordinate;
@@ -161,18 +177,114 @@ export default function Home() {
         }
         await typeText(cmd.text);
         break;
+      }
 
-      case "drag_and_drop":
-        console.warn("Drag and drop not fully implemented yet");
+      case "drag_and_drop": {
+        const source = cmd.source;
+        const dest = cmd.destination;
+        if (source && dest) {
+          const s = scaleCoords(source.x, source.y);
+          const d = scaleCoords(dest.x, dest.y);
+          await moveMouse(s.x, s.y);
+          await new Promise(r => setTimeout(r, 100)); // stabilize
+          await mouseDown("left");
+          await new Promise(r => setTimeout(r, 100));
+          await moveMouse(d.x, d.y);
+          await new Promise(r => setTimeout(r, 100));
+          await mouseUp("left");
+        }
+        break;
+      }
+
+      case "hover_at": {
+        const x = cmd.x || cmd.x_coordinate;
+        const y = cmd.y || cmd.y_coordinate;
+        if (x !== undefined && y !== undefined) {
+          const scaled = scaleCoords(x, y);
+          await moveMouse(scaled.x, scaled.y);
+        }
+        break;
+      }
+
+      case "scroll_at": {
+        const x = cmd.x || cmd.x_coordinate;
+        const y = cmd.y || cmd.y_coordinate;
+        if (x !== undefined && y !== undefined) {
+          const scaled = scaleCoords(x, y);
+          await moveMouse(scaled.x, scaled.y);
+        }
+        // Direction typically "up" or "down". 
+        // 100 is an arbitrary scroll amount, tunable.
+        const deltaY = cmd.direction === "up" ? -100 : 100;
+        await scroll(0, deltaY);
+        break;
+      }
+
+      case "scroll_document": {
+        const deltaY = cmd.direction === "up" ? -500 : 500;
+        await scroll(0, deltaY);
+        break;
+      }
+
+      case "key_combination": {
+        const keys = cmd.keys || []; // e.g. ["Control", "c"]
+        // Separate modifiers from main key
+        const modifiers = keys.filter((k: string) => ["Control", "Ctrl", "Alt", "Option", "Shift", "Meta", "Command", "Super"].includes(k));
+        const mainKey = keys.find((k: string) => !modifiers.includes(k));
+
+        if (mainKey) {
+          await pressKey(mainKey, modifiers);
+        } else if (modifiers.length > 0) {
+          // Just modifiers? Rare but possible.
+          // We can just press them via press_key("Meta", []) logic or handle separately? 
+          // Our backend implementation presses then releases immediately if passed as main 'key'.
+          // Proper way: pressKey expects a main key. If user just sends "Control", we might trap it.
+          // But usually it's "Control" + "c".
+          await pressKey(modifiers[0], []); // fallback
+        }
+        break;
+      }
+
+      case "wait_5_seconds":
+        console.log("Waiting 5 seconds...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
         break;
 
       case "open_web_browser":
-        console.log("Handling open_web_browser...");
+        console.log("Handling open_web_browser..., ", cmd);
         try {
-          await openUrl("https://google.com");
-          console.log("Browser opened successfully");
+          // Some implementations might send a url with this command
+          const targetUrl = cmd.url || "https://google.com";
+          await openUrl(targetUrl);
+          console.log("Browser opened successfully to", targetUrl);
         } catch (err) {
           console.error("Failed to open browser:", err);
+        }
+        break;
+
+      case "Maps":
+        console.log("Handling Maps..., ", cmd);
+        // "Maps" is the action name for "Navigates to a specific URL" in some Gemini contexts
+        if (cmd.url) {
+          await openUrl(cmd.url);
+        } else {
+          await openUrl("https://maps.google.com");
+        }
+        break;
+
+      case "go_back":
+        // Mac: Cmd + [
+        await pressKey("[", ["Meta"]);
+        break;
+
+      case "go_forward":
+        // Mac: Cmd + ]
+        await pressKey("]", ["Meta"]);
+        break;
+
+      case "search":
+        if (cmd.query) {
+          await openUrl(`https://www.google.com/search?q=${encodeURIComponent(cmd.query)}`);
         }
         break;
 
@@ -195,11 +307,16 @@ export default function Home() {
         try {
           const response: any = await invoke("capture_screen");
 
-          setScreenDims({
+          const newDims = {
             original: { w: response.original_width, h: response.original_height },
+            logical: { w: response.logical_width, h: response.logical_height },
             scaled: { w: response.scaled_width, h: response.scaled_height },
-            scale_factor: response.scale_factor || 1
-          });
+            scale_factor: response.scale_factor || 1,
+            offset: { x: response.x_offset || 0, y: response.y_offset || 0 }
+          };
+
+          screenDimsRef.current = newDims;
+          console.log("Updated screen dims ref:", newDims);
 
           if (channel) {
             await channel.send({

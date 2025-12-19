@@ -10,8 +10,7 @@ const model = genAI.getGenerativeModel({
     systemInstruction: {
         role: "system",
         parts: [{
-            text: `You are a computer use agent. Your goal is to help the user control their computer to accomplish tasks. 
-            Use the provided tools (click, type, mousemove) to interact with the UI based on the screenshot.`
+            text: `You are a computer use agent. Your goal is to help the user control their computer to accomplish tasks.`
         }]
     }
 });

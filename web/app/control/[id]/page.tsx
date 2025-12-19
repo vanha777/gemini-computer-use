@@ -9,7 +9,7 @@ export default function ControlPage() {
     const machineId = params.id as string;
     const [status, setStatus] = useState("connecting");
     const channelRef = useRef<any>(null);
-    const [prompt, setPrompt] = useState("navigate to browser and access google.com");
+    const [prompt, setPrompt] = useState("this is a test, try to move mouse onto the center of this screen");
     const [history, setHistory] = useState<any[]>([]);
     const [isTyping, setIsTyping] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
@@ -225,7 +225,7 @@ export default function ControlPage() {
 
             <div className="grid grid-cols-2 gap-4 w-full max-w-md">
                 <button onClick={handleTestMove} className="p-4 bg-gray-200 rounded hover:bg-gray-300 text-black">
-                    Move to Center (960,540)
+                    Move to Center (760,540)
                 </button>
                 <button onClick={handleTestType} className="p-4 bg-gray-200 rounded hover:bg-gray-300 text-black">
                     Type "Hello..."
