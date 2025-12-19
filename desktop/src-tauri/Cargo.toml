@@ -25,3 +25,6 @@ tauri = { version = "2.9.5", features = [] }
 tauri-plugin-log = "2"
 enigo = "0.3.0"
 tauri-plugin-opener = "2"
+screenshots = "0.8"
+image = { version = "0.24", features = ["png", "jpeg"] }
+base64 = "0.22"
