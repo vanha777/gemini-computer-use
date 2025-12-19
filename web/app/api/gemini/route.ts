@@ -10,7 +10,7 @@ const model = genAI.getGenerativeModel({
     systemInstruction: {
         role: "system",
         parts: [{
-            text: `You are a computer use agent. Your goal is to help the user control their computer to accomplish tasks.`
+            text: `You are a computer use agent. Your goal is to help the user control their computer to accomplish tasks. Critical: end sessions if task is finished.`
         }]
     }
 });
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
         return NextResponse.json({
             text: text,
             functionCalls: functionCalls,
-            history: history
+            history: await chat.getHistory()
         });
 
     } catch (error: any) {

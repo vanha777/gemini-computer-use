@@ -118,6 +118,7 @@ export default function ControlPage() {
         addLog("Starting AI Control...");
 
         try {
+            console.log("History:", history);
             let currentHistory = [...history]; // Use state history if we want continuation? For now starting fresh mostly.
             // If user wants to continue a session, we should use `history`. 
             // For this implementation, let's reset history on new "Start" unless we add a "Continue" button. 
@@ -143,7 +144,7 @@ export default function ControlPage() {
 
                 // 2. Send to Gemini
                 addLog("Sending to Gemini...");
-                const promptToSend = loopCount === 1 ? prompt : "Here is the current screen state. Continue realizing the user's goal if not finished.";
+                const promptToSend = loopCount === 1 ? `Plan: ${prompt}` : "Here is the current screen state.";
 
                 const res = await fetch("/api/gemini", {
                     method: "POST",
@@ -160,18 +161,20 @@ export default function ControlPage() {
 
                 addLog(`Gemini: ${data.text ? data.text.substring(0, 50) + "..." : "No text"}`);
 
-                // Update history
-                // User turn
-                currentHistory.push({
-                    role: "user",
-                    parts: [{ text: promptToSend }]
-                });
-
-                // Model turn
-                currentHistory.push({
-                    role: "model",
-                    parts: [{ text: data.text || "" }]
-                });
+                // Update history with authoritative history from server
+                if (data.history) {
+                    currentHistory = data.history;
+                } else {
+                    // Fallback (should not happen with new API)
+                    currentHistory.push({
+                        role: "user",
+                        parts: [{ text: promptToSend }]
+                    });
+                    currentHistory.push({
+                        role: "model",
+                        parts: [{ text: data.text || "" }]
+                    });
+                }
 
                 // Handling Function Calls
                 if (data.functionCalls && data.functionCalls.length > 0) {

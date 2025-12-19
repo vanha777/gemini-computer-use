@@ -250,6 +250,13 @@ export default function Home() {
         await new Promise(resolve => setTimeout(resolve, 5000));
         break;
 
+      case "navigate":
+        console.log("Handling navigate..., ", cmd);
+        if (cmd.url) {
+          await openUrl(cmd.url);
+        }
+        break;
+
       case "open_web_browser":
         console.log("Handling open_web_browser..., ", cmd);
         try {
