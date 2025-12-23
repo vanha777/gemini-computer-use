@@ -13,6 +13,7 @@ export default function ControlPage() {
     const [history, setHistory] = useState<any[]>([]);
     const [isTyping, setIsTyping] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
+    const [selectedModel, setSelectedModel] = useState("claude-opus-4-5-20251101");
 
     // We use a ref to resolve the promise when a screenshot arrives
     const screenshotResolver = useRef<((value: string) => void) | null>(null);
@@ -119,10 +120,7 @@ export default function ControlPage() {
 
         try {
             console.log("History:", history);
-            let currentHistory = [...history]; // Use state history if we want continuation? For now starting fresh mostly.
-            // If user wants to continue a session, we should use `history`. 
-            // For this implementation, let's reset history on new "Start" unless we add a "Continue" button. 
-            // The prompt "navigate..." implies a new task.
+            let currentHistory = [...history];
             currentHistory = [];
 
             let loopCount = 0;
@@ -146,10 +144,11 @@ export default function ControlPage() {
                 addLog("Sending to Gemini...");
                 const promptToSend = loopCount === 1 ? `Plan: ${prompt}` : "Here is the current screen state.";
 
-                const res = await fetch("/api/gemini", {
+                const res = await fetch("/api/agent", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
+                        model: selectedModel,
                         prompt: promptToSend,
                         history: currentHistory,
                         screenshot: screenshotBase64
@@ -251,6 +250,18 @@ export default function ControlPage() {
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                 />
+
+                <select
+                    className="w-full p-2 border rounded text-black bg-white"
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                >
+                    <option value="gemini-2.5-computer-use-preview-10-2025">Gemini 2.5 (Preview)</option>
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                    <option value="claude-opus-4-5-20251101">Claude 4.5 Opus</option>
+                </select>
+
                 <button
                     onClick={startAIControl}
                     disabled={isTyping}
