@@ -9,11 +9,11 @@ export default function ControlPage() {
     const machineId = params.id as string;
     const [status, setStatus] = useState("connecting");
     const channelRef = useRef<any>(null);
-    const [prompt, setPrompt] = useState("this is a test, try to move mouse onto the center of this screen then stop.");
+    const [prompt, setPrompt] = useState("this is a MacOS");
     const [history, setHistory] = useState<any[]>([]);
     const [isTyping, setIsTyping] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
-    const [selectedModel, setSelectedModel] = useState("claude-opus-4-5-20251101");
+    const [selectedModel, setSelectedModel] = useState("gemini-2.5-computer-use-preview-10-2025");
 
     // We use a ref to resolve the promise when a screenshot arrives
     const screenshotResolver = useRef<((value: string) => void) | null>(null);

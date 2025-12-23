@@ -51,10 +51,7 @@ async function handleGemini(modelName: string, history: any[], prompt: string, s
         systemInstruction: {
             role: "system",
             parts: [{
-                text: `
-                Your goal is to help the user control their computer to accomplish tasks.Critical: When the user's task is complete, you MUST include the word "DONE" in your response to terminate the session.
-                You are desktop app customer support agent.You help user execute cross - app, OS, computer - use operation.Critical: create a multi - step plans first, then execute each step by step, only stop when there's evidence that result is sufficient or evidence of an error has been occur. Call tool to execute operation on user computer and await response with new image to confirm until go on next task.
-                `
+                text: `You are a computer use agent. Your goal is to help the user control their computer to accomplish tasks. Critical: When the user's task is complete, you MUST include the word "DONE" in your response to terminate the session.`
             }]
         }
     });

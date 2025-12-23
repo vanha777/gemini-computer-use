@@ -236,21 +236,55 @@ export default function Home() {
         break;
       }
 
+      case "key": {
+        // Handle shortcuts string (e.g. "cmd+h", "Context+c")
+        const text = cmd.text || "";
+        // Claude generic Computer tool uses "+" to combine keys
+        const parts = text.split("+").map((s: string) => s.trim());
+        const mainKey = parts.pop(); // The last part is the main key
+
+        const modifiers = parts.map((m: string) => {
+          const lower = m.toLowerCase();
+          if (["ctrl", "control"].includes(lower)) return "Control";
+          if (["alt", "option"].includes(lower)) return "Alt";
+          if (["shift"].includes(lower)) return "Shift";
+          if (["cmd", "command", "meta", "super"].includes(lower)) return "Meta";
+          return m; // fallback or pass as is
+        });
+
+        if (mainKey) {
+          // "Meta" is what lib.rs expects for Command/Windows key
+          await pressKey(mainKey, modifiers);
+        }
+        break;
+      }
+
       case "key_combination": {
-        const keys = cmd.keys || []; // e.g. ["Control", "c"]
+        let keys = cmd.keys || [];
+        if (typeof keys === "string") {
+          // Handle Gemini's "command+space" string format
+          keys = keys.split("+").map((k: string) => k.trim());
+        }
+
+        // Normalize modifiers to match lib.rs expectations (Control, Alt, Shift, Meta)
+        const normalizedKeys = keys.map((k: string) => {
+          const lower = k.toLowerCase();
+          if (["ctrl", "control"].includes(lower)) return "Control";
+          if (["alt", "option"].includes(lower)) return "Alt";
+          if (["shift"].includes(lower)) return "Shift";
+          if (["cmd", "command", "meta", "super"].includes(lower)) return "Meta";
+          return k;
+        });
+
         // Separate modifiers from main key
-        const modifiers = keys.filter((k: string) => ["Control", "Ctrl", "Alt", "Option", "Shift", "Meta", "Command", "Super"].includes(k));
-        const mainKey = keys.find((k: string) => !modifiers.includes(k));
+        const modifiers = normalizedKeys.filter((k: string) => ["Control", "Alt", "Shift", "Meta"].includes(k));
+        const mainKey = normalizedKeys.find((k: string) => !modifiers.includes(k));
 
         if (mainKey) {
           await pressKey(mainKey, modifiers);
         } else if (modifiers.length > 0) {
-          // Just modifiers? Rare but possible.
-          // We can just press them via press_key("Meta", []) logic or handle separately? 
-          // Our backend implementation presses then releases immediately if passed as main 'key'.
-          // Proper way: pressKey expects a main key. If user just sends "Control", we might trap it.
-          // But usually it's "Control" + "c".
-          await pressKey(modifiers[0], []); // fallback
+          // Fallback if only modifier is present
+          await pressKey(modifiers[0], []);
         }
         break;
       }
